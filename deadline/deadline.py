@@ -58,7 +58,7 @@ class Deadline(object):
 
     async def get_chart(self, ctx):
         settings = self.config.guild(ctx.guild)
-        list_to_keep = ["week", "wk", "title", "fri", "sat", "sun", "3-day",
+        list_to_keep = ["title", "fri", "sat", "sun", "3-day",
                         "3-day (-%)", "rank", "film", "title"]
         most_recent_chart = pd.read_html(await settings.URL(),
                                          attrs={"class":"cc-table-container"})
@@ -88,7 +88,7 @@ class Deadline(object):
         author_image = "https://pmcdeadline2.files.wordpress.com/2014/06/anthony-dalessandro.png?w=200&h=200&crop=1"
         settings = self.config.guild(ctx.guild)
         deadline_URL = await settings.URL()
-        description = ("Movie lovers, [I have published an "
+        description = ("Film lovers, [I have published an "
                        "update with numbers.]({0})"
                        .format(deadline_URL))
         footer = ("Make sure to subscribe to alerts in the #react-for-roles "
@@ -99,20 +99,19 @@ class Deadline(object):
                                  .find("p").find("strong").text.lower())
         send_chart = False
         if "with chart" in first_part_of_article:
-            chart += info("WITH CHART")
-            send_chart = True
+            chart = await self.get_chart(ctx)
         elif "chart coming" and not "with chart":
             chart += info("REFRESH FOR CHART")
         else:
             chart += warning("NO MENTION OF CHART")
 
-        embed = discord.Embed(color=(await ctx.embed_colour()))
+        embed = discord.Embed(color=(discord.Color.from_rgb(255,255,255)))
         embed.set_author(name=author_name, url=author_url,
                          icon_url=author_image)
         embed.set_footer(text=footer)
         embed.add_field(name="Update", value=description)
-        embed.add_field(name="Chart?", value=chart, inline=False)
-        return (embed, send_chart, done)
+        embed.add_field(name="Chart", value=chart, inline=False)
+        return (embed, done)
 
     @commands.command(name="deadline")
     @checks.mod_or_permissions(manage_guild=True)
@@ -148,13 +147,10 @@ class Deadline(object):
                 for role in ctx.message.guild.roles:
                     if role.name == await settings.role_to_ping():
                         role_ = role
-                embed, send_chart, done = await self.handle_update(ctx, soup)
+                embed, done = await self.handle_update(ctx, soup)
                 try:
                     await ctx.send(role_.mention)
                     msg = await ctx.send(embed=embed) # save the msg to edit
-                    if send_chart:
-                        chart = await self.get_chart(ctx)
-                        await ctx.send(chart)
                 except discord.HTTPException:
                     await ctx.send("I need the `Embed links` permission to send this")
                     raise
