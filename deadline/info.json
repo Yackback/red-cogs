@@ -1,0 +1,12 @@
+{
+  "NAME": "Deadline",
+  "AUTHOR": "yackback",
+  "SHORT": "A cog to check for updates to Anthony D'Alessandro's weekend box office article.",
+  "INSTALL_MSG": "Thanks for installing! Remember to check [p]help deadline for help! REMEMBER THIS IS IN ALPHA",
+  "BOT_VERSION": [0,0,3],
+  "REQUIREMENTS": ["beautifulsoup4",
+                   "pandas",
+                   "requests",
+                   "tabulate"]
+  "TAGS": ["utility", "boxoffice", "info", "movies"]
+}
