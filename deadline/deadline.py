@@ -3,19 +3,23 @@
 # Discord bot to watch for Anthony changes.
 
 import asyncio
-from datetime import datetime as dt
+from datetime import datetime, time
 import logging
 import sys
 
 import bs4
+import discord
 from discord.ext import commands
+import pandas as pd
 import requests
+import tabulate
 
 from redbot.core import checks
-from redbot.core.utils.chat_formatting import box
+from redbot.core.utils.chat_formatting import box, info, warning, escape, pagify
 from redbot.core import Config
 
 deadline_url = "https://deadline.com/2018/07/tom-cruise-mission-impossible-fallout-opening-weekend-1202434739/"
+deadline_author = "Anthony D'Alessandro"
 filename_ = "/home/yack/.local/share/Red-DiscordBot/logs/cogs/deadline.txt"
 file_handler = logging.FileHandler(filename=filename_)
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -39,7 +43,8 @@ dflt_guild = {"URL"                 : deadline_url,
                                        [0,1,2,9,10],
                                        [9,10]
                                        ],
-              "role_to_ping"        : "Deadline Alerts"}
+              "role_to_ping"        : "Deadline Alerts",
+              "updates_until_done"  : []}
 
 class Deadline(object):
     """Deadline Updates"""
@@ -51,7 +56,66 @@ class Deadline(object):
         self.config.register_guild(**dflt_guild)
         self.log = logging.getLogger("redbot.cogs.deadline")
 
+    async def get_chart(self, ctx):
+        settings = self.config.guild(ctx.guild)
+        list_to_keep = ["week", "wk", "title", "fri", "sat", "sun", "3-day",
+                        "3-day (-%)", "rank", "film", "title"]
+        most_recent_chart = pd.read_html(await settings.URL(),
+                                         attrs={"class":"cc-table-container"})
+        # Quick preliminary thing to get rid of all the unnamed stuff
+        most_recent_chart = most_recent_chart[0].iloc[3:18,1:12]
+        cols = [c.lower() for c in most_recent_chart.columns
+                if c.lower() in list_to_keep]
+        most_recent_chart = most_recent_chart[cols]
+        # If fri sat and sun are in the chart, only keep the total... no one
+        # cares about the splits
+        if "fri" in cols and "sat" in cols and "sun" in cols:
+            most_recent_chart.drop(["fri", "sat", "sun"], axis=1, inplace=True)
+        most_recent_chart.to_csv("/home/yack/chart.txt", sep=";")
+        return box(tabulate.tabulate(most_recent_chart,
+                                     headers=most_recent_chart.columns,
+                                     showindex="never"))
+
+
+
+    async def handle_update(self, ctx, soup: bs4.BeautifulSoup):
+        """Handle the update and format the embed.
+        Also checks for a chart, and returns done based on that"""
+        # TODO ADD EXCEPTION FOR FRIDAY NIGHT
+        done = False
+        author_name = deadline_author
+        author_url = "https://deadline.com/author/adalessandro/"
+        author_image = "https://pmcdeadline2.files.wordpress.com/2014/06/anthony-dalessandro.png?w=200&h=200&crop=1"
+        settings = self.config.guild(ctx.guild)
+        deadline_URL = await settings.URL()
+        description = ("Movie lovers, [I have published an "
+                       "update with numbers.]({0})"
+                       .format(deadline_URL))
+        footer = ("Make sure to subscribe to alerts in the #react-for-roles "
+                  "channel so you can get notified as soon as possible!")
+        chart = ""
+        first_part_of_article = (soup.find("div",
+                                 attrs={"class": "post-content"})
+                                 .find("p").find("strong").text.lower())
+        send_chart = False
+        if "with chart" in first_part_of_article:
+            chart += info("WITH CHART")
+            send_chart = True
+        elif "chart coming" and not "with chart":
+            chart += info("REFRESH FOR CHART")
+        else:
+            chart += warning("NO MENTION OF CHART")
+
+        embed = discord.Embed(color=(await ctx.embed_colour()))
+        embed.set_author(name=author_name, url=author_url,
+                         icon_url=author_image)
+        embed.set_footer(text=footer)
+        embed.add_field(name="Update", value=description)
+        embed.add_field(name="Chart?", value=chart, inline=False)
+        return (embed, send_chart, done)
+
     @commands.command(name="deadline")
+    @checks.mod_or_permissions(manage_guild=True)
     async def deadlineUpdater(self, ctx):
         """Deadline updater, checking every <wait_time> to <URL> if
         <check_enabled> is True. Does Anthony have industry estimates?
@@ -75,19 +139,25 @@ class Deadline(object):
             if r.status_code == 200:
                 soup = bs4.BeautifulSoup(r.content, "lxml")
             else:
-                await ctx.send("WARNING: Unable to get Deadline page.")
                 await self.log.warning("Unable to get Deadline page: {0}".format(self.config["URL"]))
             time_= soup.find('time', class_ = 'date-published')
             time_ = time_.text
             if await settings.updated_time() == "":
                 await settings.updated_time.set(time_)
-            if await settings.updated_time() != time_:
-                fmt = "{role.mention}, I have published an update. Read: {url}"
+            if await settings.updated_time() != time_ or True:
                 for role in ctx.message.guild.roles:
                     if role.name == await settings.role_to_ping():
                         role_ = role
-                await ctx.send(fmt.format(role=role_,
-                                   url=await settings.URL()))
+                embed, send_chart, done = await self.handle_update(ctx, soup)
+                try:
+                    await ctx.send(role_.mention)
+                    msg = await ctx.send(embed=embed) # save the msg to edit
+                    if send_chart:
+                        chart = await self.get_chart(ctx)
+                        await ctx.send(chart)
+                except discord.HTTPException:
+                    await ctx.send("I need the `Embed links` permission to send this")
+                    raise
                 await settings.updated_time.set(time_)
                 self.log.info("ANTHONY UPDATED, MESSAGE SENT")
             else:
@@ -113,21 +183,21 @@ class Deadline(object):
             enabled = await settings.check_enabled()
 
         await ctx.send("Exiting gracefully.")
-        self.log.info("DUPLICATE UPDATER ENDED BY USER REQUEST")
+        self.log.info("UPDATER ENDED BY USER REQUEST")
         await settings.update_check_counter.set(count - 1)
         return 0
 
-    @commands.group(name="deadlineconf", no_pm=True)
+    @commands.group(name="deadlineset", no_pm=True)
     @checks.mod_or_permissions(manage_guild=True)
     async def deadlineConf(self, ctx):
         """Print the current settings"""
         settings_dict = await self.config.guild(ctx.guild).all()
         if ctx.invoked_subcommand is None:
-            msg = box("check_enabled: {check_enabled}\n"
-                      "URL: {URL}\n"
-                      "wait_time: {wait_time}\n"
+            msg = box("Checking for Update: {check_enabled}\n"
+                      "Deadline URL: {URL}\n"
+                      "Wait time between checks: {wait_time}\n"
                       "".format(**settings_dict))
-            msg += "\nSee {}help deadlineconf to edit the settings"\
+            msg += "\nSee {}help deadlineset to edit the settings"\
                 .format(ctx.prefix)
             await ctx.send(msg)
 
