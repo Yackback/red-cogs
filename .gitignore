@@ -1,3 +1,7 @@
+# Project specific stuff
+tweets/api_key.json
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
