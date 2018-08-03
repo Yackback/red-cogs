@@ -88,9 +88,10 @@ class Deadline(object):
         author_image = "https://pmcdeadline2.files.wordpress.com/2014/06/anthony-dalessandro.png?w=200&h=200&crop=1"
         settings = self.config.guild(ctx.guild)
         deadline_URL = await settings.URL()
-        description = ("Film lovers, [I have published an "
-                       "update with numbers.]({0})"
-                       .format(deadline_URL))
+        deadline_title = soup.find("h1", attrs={"class": "post-title"}).text
+        self.log.info("TITLE: {}".format(deadline_title))
+        description = ("[{0}]({1})"
+                       .format(deadline_title,deadline_URL))
         footer = ("Make sure to subscribe to alerts in the #react-for-roles "
                   "channel so you can get notified as soon as possible!")
         chart = ""
@@ -200,7 +201,9 @@ class Deadline(object):
     @deadlineConf.command(name="wait_time")
     async def configWaitTime(self, ctx, time: int):
         """Define a new pause period between Anthony's saves and proofreads.
-        (How long between update checks to the URL.)"""
+        (How long between update checks to the URL.)
+        WARNING: this will be deprecated when I implement auto checking by
+        time of day."""
         try:
             await self.config.guild(ctx.guild).wait_time.set(time)
         except TypeError:
@@ -211,7 +214,7 @@ class Deadline(object):
 
     @deadlineConf.command(pass_context=True, name="url")
     async def configURL(self, ctx, url: str):
-        """Define a new deadline link for Anthony to post to."""
+        """Define a new deadline link for the bot to check for updates."""
         if ("http://" in url or "https://" in url) and "deadline" in url:
             await self.config.guild(ctx.guild).URL.set(url)
             self.log.info("url = {0}".format(url))
@@ -224,16 +227,17 @@ class Deadline(object):
         """If check_ is 1, Anthony will write.
         If check_ is 0, Anthony will still write, the bot just won't report.
         (Toggle whether or not to check for updates.)
-        Caveat emptor: this will not disable the sleep function between update
-        checks done by [p]deadline. It will however cause [p]deadline to quit
-        when the sleep is done. This is to prevent the bad stuff that can occur
-        if it is force killed."""
+        """
         if check_ == 1:
             await self.config.guild(ctx.guild).check_enabled.set(True)
+            await ctx.send("Enabled checking for deadline updates.")
             self.log.info("check_enabled = True")
         elif check_ == 0:
             await self.config.guild(ctx.guild).check_enabled.set(False)
+            await ctx.send("Disabled checking for deadline updates.")
             self.log.info("check_enabled = False")
+        else:
+            await ctx.send("Please enter 1 or 0 to change settings.")
         else:
             await ctx.send("Please enter 1 or 0 to change settings.")
             self.log.info("check_enabled INVALID NUMBER")
