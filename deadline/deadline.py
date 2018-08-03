@@ -238,6 +238,4 @@ class Deadline(object):
             self.log.info("check_enabled = False")
         else:
             await ctx.send("Please enter 1 or 0 to change settings.")
-        else:
-            await ctx.send("Please enter 1 or 0 to change settings.")
             self.log.info("check_enabled INVALID NUMBER")
