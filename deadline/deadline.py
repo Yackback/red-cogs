@@ -97,6 +97,8 @@ class Deadline(object):
         else:
             self.log.info("No update.")
 
+        return content_  # I guess it needs something to be returned (not None)
+
     async def handle_update(self, ctx, content_, soup):
         settings = self.config.guild(ctx.guild)
         # Find this stuff automatically I guess.
