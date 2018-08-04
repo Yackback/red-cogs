@@ -19,7 +19,6 @@ from redbot.core.utils.chat_formatting import box, info, warning
 from redbot.core import Config
 
 dflt_guild = {"deadline_url": None,
-              "edit_mode": False,
               "footer": ("Make sure to subscribe to alerts in the "
                          "#react-for-roles channel so you can get notified "
                          "when we release more breaking news."),
