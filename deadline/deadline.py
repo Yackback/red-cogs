@@ -18,14 +18,15 @@ from redbot.core import checks
 from redbot.core.utils.chat_formatting import box, info, warning
 from redbot.core import Config
 
-dflt_guild = {"edit_mode": False,
+dflt_guild = {"deadline_url": None,
+              "edit_mode": False,
               "footer": ("Make sure to subscribe to alerts in the "
                          "#react-for-roles channel so you can get notified "
                          "when we release more breaking news."),
               "last_updated_content": "",
               "last_updated_text": "",
               "last_updated_time": "",
-              "deadline_url": None}
+              "stop_checking": False}
 
 
 class Deadline(object):
@@ -42,7 +43,10 @@ class Deadline(object):
         most_recent_chart = pd.read_html(await settings.URL(),
                                          attrs={"class": "cc-table-container"})
         # Quick preliminary thing to get rid of all the unnamed stuff
-        most_recent_chart = most_recent_chart[0].iloc[3:18, 1:12]
+        try:
+            most_recent_chart = most_recent_chart[0].iloc[3:18, 1:12]
+        except IndexError:
+            return ""
         cols = [c.lower() for c in most_recent_chart.columns
                 if c.lower() in list_to_keep]
         most_recent_chart = most_recent_chart[cols]
@@ -58,8 +62,11 @@ class Deadline(object):
     @commands.group(name="deadline", no_pm=True)
     @checks.mod_or_permissions(manage_guild=True)
     async def deadline_main(self, ctx):
+        """The Deadline cog provides a way to check for updates throughout the
+        weekend when supplied with a deadline url. Please call 
+        `[p]deadline begin` for more info"""
         if ctx.invoked_subcommand is None:
-            self.send_help_cmd()
+            self.send_cmd_help()
 
     @deadline_main.group("set", no_pm=True)
     async def deadline_set(self, ctx):
@@ -95,7 +102,7 @@ class Deadline(object):
             # of each interval.
             await settings.edit_mode.set(True)
         else:
-            self.log.info("No update.")
+            self.log.info("no update")
 
         return content_  # I guess it needs something to be returned (not None)
 
@@ -113,20 +120,14 @@ class Deadline(object):
         deadline_title = soup.find("h1", class_="post-title").text
         footer = await settings.footer()
 
-        # Chart time
-        chart = ""
-
         # Deal with the chart. :)
-        # If in edit mode, make sure to edit the previous post above
-        # and make the chart? Maybe include a config option on whether to
-        # edit or not.
         chart_string = (soup.find("div",
                                   attrs={"class": "post-content"})
                                   .find("p").find("strong").text.lower())
-        send_chart = False
+        chart = ""
         if "with chart" in chart_string:
             chart = await self.get_chart(ctx)
-        if "chart coming" in chart_string:
+        elif "chart coming" in chart_string:
             chart += info("CHART COMING")
         elif "refresh for chart" in self.get_chart(ctx):
             chart += info("REFRESH FOR CHART")
@@ -209,6 +210,10 @@ class Deadline(object):
                                             CronTrigger(day_of_week="sun",
                                                         hour="9-11",
                                                         minute="*")])
+        
+        weekend_end_trigger = CronTrigger(day_of_week="sun",
+                                          hour="12",
+                                          minute="0")
 
         """
         reset_edit_mode_trigger = OrTrigger([CronTrigger(day_of_week="fri",
@@ -238,13 +243,23 @@ class Deadline(object):
 
         sunday_morning = scheduler.add_job(await self.deadline_update(ctx),
                                            sunday_morning_trigger)
+                                           
+        weekend_end = scheduler.add_job(await self.config.guild(ctx.guild).stop_checking.set(False),
+                                        weekend_end_trigger)
 
         # And... start!
         scheduler.start()
+        
+        # Now check if we should stop
+        while not await self.config.guild(ctx.guild).stop_checking():
+            time.sleep(10)
+        
+        scheduler.shutdown()
+        self.log.info("shutdown scheduler")
+        await self.config.guild(ctx.guild).stop_checking.set(False)
 
-    @deadline_main.command(name="stop")
-    async def deadline_stop(self, ctx, force: str = ""):
-        if force == "force":
-            force = True
-        else:
-            force = False
+    @deadline_set.command(name="stop")
+    async def deadline_set_stop(self, ctx, force: str = ""):
+        await self.config.guild(ctx.guild).stop_checking.set(True)
+        self.log.info("checking stopped by user request.")
+        
