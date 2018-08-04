@@ -100,7 +100,7 @@ class Deadline(object):
                                  .find("p").find("strong").text.lower())
         send_chart = False
         if "with chart" in first_part_of_article:
-            chart = await self.get_chart(ctx)
+            chart = await self.get_chart(ctx) 
         elif "chart coming" and not "with chart":
             chart += info("REFRESH FOR CHART")
         else:
@@ -239,3 +239,11 @@ class Deadline(object):
         else:
             await ctx.send("Please enter 1 or 0 to change settings.")
             self.log.info("check_enabled INVALID NUMBER")
+            
+    @deadlineConf.command(pass_context=True, name="role_name")
+    async def configRoleName(self, ctx, role_: str):
+      """Change the name of the role to ping when a Deadline update is found"""
+      await self.config.guild(ctx.guild).role_to_ping.set(name)
+      await ctx.send("Role name updated.")
+      self.log.info("For guild {}, role_to_ping updated to {}".format(ctx.guild.id,
+                                                                      name))
