@@ -3,6 +3,7 @@
 # Discord bot to watch for Anthony changes.
 
 import logging
+import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.combining import OrTrigger
@@ -62,16 +63,16 @@ class Deadline(object):
     @checks.mod_or_permissions(manage_guild=True)
     async def deadline_main(self, ctx):
         """The Deadline cog provides a way to check for updates throughout the
-        weekend when supplied with a deadline url. Please call 
+        weekend when supplied with a deadline url. Please call
         `[p]deadline begin` for more info"""
         if ctx.invoked_subcommand is None:
-            self.send_cmd_help()
+            await ctx.send_help()
 
     @deadline_main.group("set", no_pm=True)
     async def deadline_set(self, ctx):
         if ctx.invoked_subcommand is None or isinstance(ctx.invoked_subcommand,
                                                         commands.Group):
-            self.send_cmd_help()
+            await ctx.send_help()
 
     async def deadline_update(self, ctx):
         """Check for an update. This is based on whatever URL was specified
@@ -149,6 +150,9 @@ class Deadline(object):
         :param: friday_morning: whether to check for a Fri morning update. To be
         used after a Thurs preview. Dflt False."""
 
+        if url is None:
+            await ctx.send_help()
+
         # Quickly set the deadline URL if it is one
         if ("https://" in url or "http://" in url) and "deadline" in url:
             await self.config.guild(ctx.guild).deadline_url.set(url)
@@ -209,7 +213,7 @@ class Deadline(object):
                                             CronTrigger(day_of_week="sun",
                                                         hour="9-11",
                                                         minute="*")])
-        
+
         weekend_end_trigger = CronTrigger(day_of_week="sun",
                                           hour="12",
                                           minute="0")
@@ -242,23 +246,23 @@ class Deadline(object):
 
         sunday_morning = scheduler.add_job(await self.deadline_update(ctx),
                                            sunday_morning_trigger)
-                                           
-        weekend_end = scheduler.add_job(await self.config.guild(ctx.guild).stop_checking.set(False),
-                                        weekend_end_trigger)
 
         # And... start!
         scheduler.start()
-        
+        self.log.info("started scheduler")
+        fmt = ("Started scheduler, searching for updates at designated times"
+               "...")
+        await ctx.send(fmt)
+
         # Now check if we should stop
         while not await self.config.guild(ctx.guild).stop_checking():
             time.sleep(10)
-        
+
         scheduler.shutdown()
         self.log.info("shutdown scheduler")
         await self.config.guild(ctx.guild).stop_checking.set(False)
 
     @deadline_set.command(name="stop")
     async def deadline_set_stop(self, ctx, force: str = ""):
-        await self.config.guild(ctx.guild).stop_checking.set(True)
         self.log.info("checking stopped by user request.")
-        
+        await self.config.guild(ctx.guild).stop_checking.set(True)
