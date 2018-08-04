@@ -127,11 +127,11 @@ class Deadline(object):
         if "with chart" in chart_string:
             chart = await self.get_chart(ctx)
         elif "chart coming" in chart_string:
-            chart += info("CHART COMING")
+            chart = info("CHART COMING")
         elif "refresh for chart" in self.get_chart(ctx):
-            chart += info("REFRESH FOR CHART")
+            chart = info("REFRESH FOR CHART")
         else:
-            chart += warning("NO DISCERNABLE MENTION OF CHART")
+            chart = warning("NO DISCERNABLE MENTION OF CHART")
 
         embed = discord.Embed(color=(discord.Color.from_rgb(255,255,255)))
         embed.set_author(name=author_name, url=author_link,
