@@ -1,0 +1,9 @@
+{
+  "NAME": "ReactionTrack",
+  "AUTHOR": "yackback",
+  "SHORT": "A cog to record statistics on which emojis are used.",
+  "INSTALL_MSG": "Thanks for installing! Remember to check [p]help deadline for help! REMEMBER THIS IS IN ALPHA",
+  "BOT_VERSION": [0,0,1],
+  "REQUIREMENTS": []
+  "TAGS": ["utility", "stats", "emoji", "emojis"]
+}
