@@ -3,6 +3,7 @@
 # Discord bot to watch for Anthony changes.
 
 import logging
+import sys
 import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -28,6 +29,15 @@ dflt_guild = {"deadline_url": None,
               "last_updated_time": "",
               "stop_checking": False}
 
+filename_ = "/home/yack/.local/share/Red-DiscordBot/logs/cogs/deadline.txt"
+file_handler = logging.FileHandler(filename=filename_)
+stdout_handler = logging.StreamHandler(sys.stdout)
+handlers = [file_handler, stdout_handler]
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+    handlers=handlers
+)
 
 class Deadline(object):
     def __init__(self, bot):
@@ -77,6 +87,7 @@ class Deadline(object):
     async def deadline_update(self, ctx):
         """Check for an update. This is based on whatever URL was specified
         by [p]deadline_begin."""
+        self.log.info("Checking for update...")
         settings = self.config.guild(ctx.guild)
         deadline_url = await settings.deadline_url()
         r = requests.get(deadline_url)
