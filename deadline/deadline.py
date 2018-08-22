@@ -115,8 +115,6 @@ class Deadline(object):
         else:
             self.log.info("no update")
 
-        return content_  # I guess it needs something to be returned (not None)
-
     async def handle_update(self, ctx, content_, soup):
         settings = self.config.guild(ctx.guild)
         # Find this stuff automatically I guess.
@@ -140,7 +138,7 @@ class Deadline(object):
             chart = await self.get_chart(ctx)
         elif "chart coming" in chart_string:
             chart = info("CHART COMING")
-        elif "refresh for chart" in self.get_chart(ctx):
+        elif "refresh for chart" in chart_string:
             chart = info("REFRESH FOR CHART")
         else:
             chart = warning("NO DISCERNABLE MENTION OF CHART")
@@ -160,7 +158,7 @@ class Deadline(object):
         :param: url: the deadline article URL
         :param: friday_morning: whether to check for a Fri morning update. To be
         used after a Thurs preview. Dflt False."""
-
+        logging.getLogger('apscheduler').setLevel(logging.DEBUG)
         if url is None:
             await ctx.send_help()
 
@@ -184,7 +182,9 @@ class Deadline(object):
             friday_morning_trigger = CronTrigger(day_of_week="fri", hour="10-11",
                                                 minute="*")
 
-            scheduler.add_job(self.deadline_update, friday_morning_trigger)
+            scheduler.add_job(await self.deadline_update(ctx),
+                              friday_morning_trigger)
+
             reset_edit_mode_trigger_fri_morn = OrTrigger([CronTrigger(day_of_week="fri",
                                                                     hour="10")])
             reset_edit_mode_fri_morn = scheduler.add_job(reset_edit_mode(self,ctx),
@@ -243,17 +243,17 @@ class Deadline(object):
         #                 reset_edit_mode_trigger)
 
         # Weekends on, time to go to work.
-        friday_afternoon = scheduler.add_job(await self.deadline_update(ctx),
-                                             friday_afternoon_trigger)
+        scheduler.add_job(await self.deadline_update(ctx),
+                          friday_afternoon_trigger)
 
-        friday_night = scheduler.add_job(await self.deadline_update(ctx),
+        scheduler.add_job(await self.deadline_update(ctx),
                                          friday_night_trigger)
 
         saturday_morning = scheduler.add_job(await self.deadline_update(ctx),
                                              saturday_morning_trigger)
 
-        saturday_night = scheduler.add_job(await self.deadline_update(ctx),
-                                           saturday_night_trigger)
+        scheduler.add_job(await self.deadline_update(ctx),
+                          saturday_night_trigger)
 
         sunday_morning = scheduler.add_job(await self.deadline_update(ctx),
                                            sunday_morning_trigger)
