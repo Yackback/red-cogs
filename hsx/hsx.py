@@ -103,7 +103,7 @@ class HSX(object):
         if len(topic.tags) > 0:
             title_tags = ""
             for tag in topic.tags:
-                title_tags += "[\[{}\]](https:\/\/www\.hsx\.com\/security\/view\/{}), ".format(tag, tag)
+                title_tags += "[{}](https:\/\/www\.hsx\.com\/security\/view\/{}), ".format(tag, tag)
             title_tags = title_tags[:-2] # remove the last ", "
             embed.add_field(name="Tags From Title", value=title_tags, inline=False)
         # Submit time
