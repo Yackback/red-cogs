@@ -3,7 +3,7 @@
   "AUTHOR": "yackback",
   "SHORT": "A cog with some HSX utilities.",
   "INSTALL_MSG": "Thanks for installing! Remember to check [p]help hsx for help!",
-  "BOT_VERSION": [0,5,0],
+  "BOT_VERSION": [0,5,1],
   "REQUIREMENTS": ["beautifulsoup4",
                    "requests"],
   "TAGS": ["utility", "boxoffice", "info", "movies"]
