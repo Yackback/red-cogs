@@ -47,7 +47,7 @@ class Topic(object):
         body = resolve_soup.find("div", attrs={"id": "post_message_body"})
         body = ' '.join([p.text.lstrip() for p in body.find_all("p")])
         def makeUpper(match):
-            return "[\[" + match.group(1).upper() + "\]](http:\/\/www\.hsx\.com\/security\/view\/" +\
+            return "[" + match.group(1).upper() + "](http:\/\/www\.hsx\.com\/security\/view\/" +\
                 match.group(1).upper() + ")"
         body = re.sub(r"\[([^]]+)\]",
                       makeUpper,
