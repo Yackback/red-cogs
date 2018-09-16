@@ -16,6 +16,7 @@ from redbot.core.utils.chat_formatting import warning
 from redbot.core import Config
 
 dflt_guild = {"runPosttrack": True,
+              "wait_time": 60,
               "allowed_channel": None,
               "topics": list(),
               "whitelist": list() # TODO
@@ -83,7 +84,7 @@ class HSX(object):
         channel_id = await self.config.guild(ctx.guild).allowed_channel()
         # Make sure there is an allowed channel.
         if channel_id is None:
-            await ctx.send("Allowed channel not set up. Please run [p]hsx config set allowed_channel <allowed_id>.")
+            await ctx.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
             return False
         return ctx.channel.id == channel_id
 
@@ -167,18 +168,26 @@ class HSX(object):
     @hsx_config_set.command(name="allowed_id")
     @checks.mod_or_permissions(manage_guild=True)
     async def hsx_config_set_allowed_id(self, ctx, allowed_id):
+        fmt = "Variable allowed_id updated for guild id {} to {}"
+        self.log.info(fmt.format(ctx.guild.id, str(allowed_id)))
         await self.config.guild(ctx.guild).allowed_channel.set(int(allowed_id))
 
 
     @hsx_config_get.command(name="allowed_id")
     @checks.mod_or_permissions(manage_guild=True)
     async def hsx_config_get_allowed_id(self, ctx):
-        await ctx.send(await self.config.guild(ctx.guild).allowed_channel())
+        id_ = await self.config.guild(ctx.guild).allowed_channel()
+        if id_ is not None:
+            await ctx.send(id_)
+        else:
+            await ctx.send("allowed_id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
 
 
     @hsx_config_set.command(name="wait_time")
     @checks.mod_or_permissions(manage_guild=True)
     async def hsx_config_set_wait_time(self, ctx, wait_time):
+        fmt = "Variable wait_time updated for guild id {} to {}"
+        self.log.info(fmt.format(ctx.guild.id, str(wait_time)))
         await self.config.guild(ctx.guild).wait_time.set(int(wait_time))
 
 
@@ -228,9 +237,10 @@ class HSX(object):
                         embed = self.make_embed(topic_)
                         await ctx.send(embed=embed)
             if quiet: # Quiet mode exits after population.
-                await ctx.send("Populated post cache.")
+                await ctx.send("Populated post cache in quiet mode, now exiting. "
+                               "Please run again to turn on sending messages.")
                 return
-            wait_time = self.config.guild(ctx.guild).wait_time()
+            wait_time = await self.config.guild(ctx.guild).wait_time()
             self.log.info("Waiting {} seconds before checking again.".format(wait_time))
             await asyncio.sleep(wait_time)
 
@@ -247,25 +257,16 @@ class HSX(object):
     @checks.mod_or_permissions(manage_guild=True)
     @hsx_posttrack.command(name="clear")
     async def hsx_posttrack_clear(self, ctx):
-        """Clear the post cache"""
+        """clear the post cache, but ask for confirmation first"""
         if not await self.check_channel(ctx):
             return
         settings = self.config.guild(ctx.guild)
         await ctx.send(warning("WARNING: this is a dangerous operation."))
-        await ctx.send("1/2: Are you sure you want to proceed? Please answer Y or N.")
+        await ctx.send("Are you sure you want to proceed? Please answer Y or N.")
         check = lambda m: m.content == "Y" and\
             m.channel == ctx.channel and m.author == ctx.message.author
         try:
-            message = await self.bot.wait_for('message', check=check, timeout=30.0)
-        except:
-            await ctx.send("Timed out. Leaving post cache as is.")
-            return
-
-        await ctx.send("2/2: Would you like to quietly populate the cache with the current first page of posts? Please answer Y or N.")
-        check = lambda m: m.content == "N" or m.content == "Y" and\
-            m.channel == ctx.channel and m.author == ctx.message.author
-        try:
-            message = await self.bot.wait_for('message', check=check, timeout=30.0)
+            await self.bot.wait_for('message', check=check, timeout=30.0)
         except:
             await ctx.send("Timed out. Leaving post cache as is.")
             return
@@ -274,12 +275,6 @@ class HSX(object):
         await settings.topics.clear()
         await ctx.send("Deleted post cache.")
 
-        if message.content == "Y":
-            await self.hsx_posttrack_start(ctx, quiet=True)
-            await ctx.send("Quietly repopulated post cache..."
-                           "`run [p]hsx posttrack start` to begin tracking again.")
-
-    
             
     """
     # WIP
