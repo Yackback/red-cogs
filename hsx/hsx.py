@@ -113,9 +113,10 @@ class HSX(object):
 
     @commands.group(name="hsx")
     async def hsx_main(self, ctx):
+        """The HSX cog. Useless outside of the allowed channel id (#hsx)."""
         if ctx.invoked_subcommand is None:
-            if await self.check_channel(ctx):
-                await ctx.send_help()
+            return None
+
 
 
     @checks.mod_or_permissions(manage_guild=True)
