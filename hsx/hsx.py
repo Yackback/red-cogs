@@ -207,9 +207,11 @@ class HSX(object):
         :param: quiet: whether to simply populate the database (to be used
         after a clear). Defaults to False
         """
-        if not await self.check_channel(ctx):
+        channel = self.bot.get_channel(await self.config.guild(ctx.guild).allowed_channel())
+        if channel is None:
+            await ctx_or_msg.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
             return
-        await ctx.send("Starting")
+        await ctx.send("Starting in channel {}".format(channel.mention))
         url = "https://www.hsx.com/forum/forum.php?id=3"
         await self.config.guild(ctx.guild).runPosttrack.set(True)
         self.log.info("Starting posttrack to check for new posts...")
@@ -236,7 +238,7 @@ class HSX(object):
                     if not quiet and topic_.subject != rm_str:
                         self.log.debug("New post found, sending embed.")
                         embed = self.make_embed(topic_)
-                        await ctx.send(embed=embed)
+                        await channel.send(embed=embed)
             if quiet: # Quiet mode exits after population.
                 await ctx.send("Populated post cache in quiet mode, now exiting. "
                                "Please run again to turn on sending messages.")
