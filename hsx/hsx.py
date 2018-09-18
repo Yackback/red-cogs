@@ -72,21 +72,27 @@ class Topic(object):
         return (subj, body, tags, author_nick, author, author_icon, time_)
 
 
+
 class HSX(object):
+
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=720830880)
         self.config.register_guild(**dflt_guild)
         self.log = logging.getLogger("redbot.cogs.hsx")
+        self.bot.add_listener(self.stock_finder, "on_message")
 
-    async def check_channel(self, ctx):
+    async def check_channel(self, ctx_or_msg):
         # These commands only work in the hsx channel, so we check them.
-        channel_id = await self.config.guild(ctx.guild).allowed_channel()
-        # Make sure there is an allowed channel.
-        if channel_id is None:
-            await ctx.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
+        # First, no pms
+        if type(ctx_or_msg) == discord.Message and ctx_or_msg.guild is None:
             return False
-        return ctx.channel.id == channel_id
+        channel_id = await self.config.guild(ctx_or_msg.guild).allowed_channel()
+        # Make sure there is an allowed channel.
+        if channel_id is None and type(ctx_or_msg) is discord.ext.commands.Context:
+            await ctx_or_msg.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
+            return False
+        return ctx_or_msg.channel.id == channel_id
 
     def make_embed(self, topic: Topic):
         embed = discord.Embed(color=(discord.Color.from_rgb(167, 200, 116)))
@@ -109,6 +115,79 @@ class HSX(object):
         # Submit time
         embed.add_field(name="Submitted on", value=topic.time_)
         return embed
+    
+    async def stock_finder(self, message):
+        # this will exclude pms and stuff not in the right channel       
+        if not await self.check_channel(message):
+            return
+
+        matches = re.compile(r"\[([^]]+)\]").findall(message.content)
+        for match in matches:
+            url = "http://www.hsx.com/security/view/{}".format(match)
+            r = requests.get(url)
+            if r.status_code == 200:
+                soup = bs4.BeautifulSoup(r.content, "lxml")
+            else:
+                fmt = "Connection error for stock {}."
+                await message.channel.send(fmt.format(match))
+                continue
+            try:
+                title = soup.find("div", class_="security_data").find("h1").text
+                summary = soup.find("div", class_="security_summary")
+                priceline = summary.find("p", class_="value").text
+                price = priceline[0:priceline.find(".")+3]
+                delist = "Delist" in summary.find("p", class_="labels").text
+            except AttributeError:
+                fmt = "Stock {} not found."
+                await message.channel.send(fmt.format(match))
+                continue
+            icon_url = soup.find("img", id="security_poster").get("src")
+            if "http" not in icon_url:
+                icon_url = "https://www.hsx.com" + icon_url
+            # Get the change from the priceline
+            change = priceline[len(price):]
+            if not delist:
+                # the span's class is either up or down, so get it then titlecase
+                up_or_down = summary.find("p", class_="value").find("span").get("class")[0]
+                if up_or_down != "no_change":
+                    up_or_down = up_or_down[0].upper() + up_or_down[1:]
+                    # format the string
+                    change = "{0} ({1} {2})".format(change.split(" ")[0], up_or_down, change.split(" ")[1][1:-1])
+                elif "Pre-IPO" in soup.find("div", class_="data_column").prettify():
+                    shares = soup.find("a", href="/trade/index.php?symbol={}".format(match)).text
+                    change = "Pre-IPO, {} will be sold.".format(shares)
+                elif "IPO Info:" in soup.prettify():
+                    shares = soup.find("a", href="/trade/index.php?symbol={}".format(match)).text
+                    change = "IPO, {} left.".format(shares)
+                else:
+                    change = "No change today."
+            else:
+                change = "Delisted"
+            # TODO: GET KAIGEE URL BY USING FundManager, Credits -> Filmography, Credits -> Distributor, or TVStocks description
+            """ Find the type of stock. """
+            kaigee_base = "[{1}](https://www.kaigee.com/{0}/{1})"
+            if soup.find("div", class_="inner_columns").find("h4").text == "Distributor":
+                kaigee = kaigee_base.format("MST", match)
+            elif soup.find("div", class_="inner_columns").find("h4").text == "Filmography":
+                kaigee = kaigee_base.format("SBO", match)
+            elif "." in match:
+                kaigee = "None, derivative."
+            elif "Fund Manager:" in soup.find("div", class_="data_column").prettify():
+                kaigee = kaigee_base.format("FND", match)
+            elif "TVStocks" in soup.find("div", class_="whitebox_content").prettify():
+                kaigee = "None, TVStock."
+            else:
+                kaigee = "Unknown."
+            embed = discord.Embed(color=(discord.Color.from_rgb(167, 200, 116)))
+            embed.set_footer(text="Happy trades!")
+            embed.set_author(name=title, url=url,
+                icon_url=icon_url)
+            embed.add_field(name=match, value=price)
+            embed.add_field(name="Change Today", value=change)
+            embed.add_field(name="Kaigee Link", value=kaigee, inline=False)
+            await message.guild.me.edit(nick="HSX")
+            await message.channel.send(embed=embed)
+            await message.guild.me.edit(nick=None)
 
 
     @commands.group(name="hsx")
@@ -134,18 +213,6 @@ class HSX(object):
         if ctx.invoked_subcommand is None or isinstance(ctx.invoked_subcommand,
                                                         commands.Group):
             await ctx.send_help()
-
-
-    """
-    # WIP
-    @hsx_main.command(name="stock")
-    async def hsx_stock(self, ctx=None, stock_or_msg: str = ""):
-        \"""Handle printing out information about stocks.\"""
-        if not await self.check_channel(ctx):
-            return
-        if stock is None:
-            await ctx.send_help()
-    """
 
 
     @hsx_config.group(name="set")
@@ -209,7 +276,7 @@ class HSX(object):
         """
         channel = self.bot.get_channel(await self.config.guild(ctx.guild).allowed_channel())
         if channel is None:
-            await ctx_or_msg.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
+            await ctx.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
             return
         await ctx.send("Starting in channel {}".format(channel.mention))
         url = "https://www.hsx.com/forum/forum.php?id=3"
@@ -279,19 +346,3 @@ class HSX(object):
         await ctx.send("Deleted post cache.")
 
             
-    """
-    # WIP
-    async def on_message(self, message):
-        settings = self.config.guild(ctx.guild)
-        if message.guild is None:
-            return
-        
-        if not await self.check_channel(await settings.allowed_channel):
-            return
-
-        matches = re.compile(r"\[([^]]+)\]").findall(message.content)
-        for match in matches:
-            await self.hsx_stock(self, stock=match[1:-1])
-        
-
-    """
