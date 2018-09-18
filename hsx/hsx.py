@@ -120,7 +120,6 @@ class HSX(object):
         # this will exclude pms and stuff not in the right channel       
         if not await self.check_channel(message):
             return
-        settings = self.config.guild(message.guild)
 
         matches = re.compile(r"\[([^]]+)\]").findall(message.content)
         for match in matches:
@@ -214,18 +213,6 @@ class HSX(object):
         if ctx.invoked_subcommand is None or isinstance(ctx.invoked_subcommand,
                                                         commands.Group):
             await ctx.send_help()
-
-
-    # WIP
-    @hsx_main.command(name="stock")
-    async def hsx_stock(self, ctx=None, stock: str = ""):
-        """Handle printing out information about stocks."""
-        if not await self.check_channel(ctx):
-            return
-        if stock == "":
-            await ctx.send_help()
-        await ctx.send(embed=handle_stock(stock))
-    
 
 
     @hsx_config.group(name="set")
