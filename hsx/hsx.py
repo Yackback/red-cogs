@@ -163,8 +163,7 @@ class HSX(object):
                     change = "No change today."
             else:
                 change = "Delisted"
-            # TODO: GET KAIGEE URL BY USING FundManager, Credits -> Filmography, Credits -> Distributor, or TVStocks description
-            """ Find the type of stock. """
+            """ Find the type of stock to get the KaiGee url. """
             kaigee_base = "[{1}](https://www.kaigee.com/{0}/{1})"
             if soup.find("div", class_="inner_columns").find("h4").text == "Distributor":
                 kaigee = kaigee_base.format("MST", match)
@@ -174,7 +173,7 @@ class HSX(object):
                 kaigee = "None, derivative."
             elif "Fund Manager:" in soup.find("div", class_="data_column").prettify():
                 kaigee = kaigee_base.format("FND", match)
-            elif "TVStocks" in soup.find("div", class_="whitebox_content").prettify():
+            elif "TVStocks" in soup.prettify():
                 kaigee = "None, TVStock."
             else:
                 kaigee = "Unknown."
