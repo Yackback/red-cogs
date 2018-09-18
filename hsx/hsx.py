@@ -123,7 +123,7 @@ class HSX(object):
 
         matches = re.compile(r"\[([^]]+)\]").findall(message.content)
         for match in matches:
-            url = "http://www.hsx.com/security/view/{}".format(match)
+            url = "https://www.hsx.com/security/view/{}".format(match)
             r = requests.get(url)
             if r.status_code == 200:
                 soup = bs4.BeautifulSoup(r.content, "lxml")
