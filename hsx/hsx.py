@@ -289,7 +289,7 @@ class HSX(object):
         """
         channel = self.bot.get_channel(await self.config.guild(ctx.guild).allowed_channel())
         if channel is None:
-            await ctx_or_msg.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
+            await ctx.send("Allowed channel id not set up. Please run `[p]hsx config set allowed_id <allowed_id>`.")
             return
         await ctx.send("Starting in channel {}".format(channel.mention))
         url = "https://www.hsx.com/forum/forum.php?id=3"
