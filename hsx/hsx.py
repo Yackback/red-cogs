@@ -101,7 +101,10 @@ class HSX(object):
                          icon_url=topic.author_icon)
         embed.set_footer(text="Happy trades!")
         if topic.body != "":
-            embed.add_field(name=topic.subject, value=topic.body)
+            if len(topic.body) < 1500:
+                embed.add_field(name=topic.subject, value=topic.body)
+            else:
+                embed.add_field(name=topic.subject, value=topic.body[:1497]+"...")
         else:
             embed.add_field(name=topic.subject, value="\u200b")
         # Add a field for tags in the title because you cant have links in a field name,
