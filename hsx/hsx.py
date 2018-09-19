@@ -154,10 +154,16 @@ class HSX(object):
                     # format the string
                     change = "{0} ({1} {2})".format(change.split(" ")[0], up_or_down, change.split(" ")[1][1:-1])
                 elif "Pre-IPO" in soup.find("div", class_="data_column").prettify():
-                    shares = soup.find("a", href="/trade/index.php?symbol={}".format(match)).text
-                    change = "Pre-IPO, {} will be sold.".format(shares)
+                    try:
+                        shares = soup.find("a", href="/trade/index.php?symbol={}".format(match)).text
+                    except AttributeError:
+                        shares = "unknown shares"
+                    change = "Pre-IPO, {} will be sold at starting price.".format(shares)
                 elif "IPO Info:" in soup.prettify():
-                    shares = soup.find("a", href="/trade/index.php?symbol={}".format(match)).text
+                    try:
+                        shares = soup.find("a", href="/trade/index.php?symbol={}".format(match)).text
+                    except:
+                        shares = "unknown shares"
                     change = "IPO, {} left.".format(shares)
                 else:
                     change = "No change today."
