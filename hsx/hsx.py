@@ -95,6 +95,8 @@ class HSX(object):
 
     def make_embed(self, topic: Topic):
         embed = discord.Embed(color=(discord.Color.from_rgb(167, 200, 116)))
+        # It's not a not a well formed url if it has spaces
+        topic.author = topic.author.replace(" ", "%20")
         embed.set_author(name=topic.author_nick,
                          url="https://www.hsx.com/profile/index.php?uname="+topic.author,
                          icon_url=topic.author_icon)
