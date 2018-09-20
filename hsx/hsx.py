@@ -312,7 +312,9 @@ class HSX(object):
                     if not quiet and topic_.subject != rm_str:
                         self.log.debug("New post found, sending embed.")
                         embed = self.make_embed(topic_)
+                        await ctx.guild.me.edit(nick="HSX")
                         await channel.send(embed=embed)
+                        await ctx.guild.me.edit(nick=None)
             if quiet: # Quiet mode exits after population.
                 await ctx.send("Populated post cache in quiet mode, now exiting. "
                                "Please run again to turn on sending messages.")
