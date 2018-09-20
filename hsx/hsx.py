@@ -47,8 +47,7 @@ class Topic(object):
         body = resolve_soup.find("div", attrs={"id": "post_message_body"})
         body = ' '.join([p.text.lstrip() for p in body.find_all("p")])
         def makeUpper(match):
-            return "[" + match.group(1).upper() + "](http:\/\/www\.hsx\.com\/security\/view\/" +\
-                match.group(1).upper() + ")"
+            return "[{0}](https:\/\/www\.hsx\.com\/security\/view\/{0})".format(match.group(1).upper())
         body = re.sub(r"\[([^]]+)\]",
                       makeUpper,
                       body)
@@ -101,10 +100,10 @@ class HSX(object):
                          icon_url=topic.author_icon)
         embed.set_footer(text="Happy trades!")
         if topic.body != "":
-            if len(topic.body) < 1500:
+            if len(topic.body) < 1021:
                 embed.add_field(name=topic.subject, value=topic.body)
             else:
-                embed.add_field(name=topic.subject, value=topic.body[:1497]+"...")
+                embed.add_field(name=topic.subject, value=topic.body[:1021]+"...")
         else:
             embed.add_field(name=topic.subject, value="\u200b")
         # Add a field for tags in the title because you cant have links in a field name,
