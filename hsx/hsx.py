@@ -46,6 +46,12 @@ class Topic(object):
                                                       subj)]
         body = resolve_soup.find("div", attrs={"id": "post_message_body"})
         body = ' '.join([p.text.lstrip() for p in body.find_all("p")])
+        # Formatting for Official Cashouts post.
+        if subj == "Official Cashouts":
+            # the "- Opening Weekend" messes with the line spacing
+            body = body.replace ("- Opening Weekend", "OW")
+            body = "\n".join([cashout for cashout in body.split("-")])
+            body = body.replace("(", "[").replace(")","]")
         def makeUpper(match):
             return "[{0}](https:\/\/www\.hsx\.com\/security\/view\/{0})".format(match.group(1).upper())
         body = re.sub(r"\[([^]]+)\]",
@@ -66,6 +72,8 @@ class Topic(object):
         # He doesn't have an image.
         if author == "Antibody":
             author_icon = "https://www.hsx.com/images/logo_deco.gif"
+
+            
         regex = r'(Jan?|Feb?|Mar?|Apr?|May?|Jun?|Jul?|Aug?|Sep?|Oct?|Nov?|Dec?)\s+\d{1,2},\s+\d{1,2}:\d{2}'
         time_ = re.search(regex, author_nick_string).group(0)
         return (subj, body, tags, author_nick, author, author_icon, time_)
@@ -105,7 +113,12 @@ class HSX(object):
             if len(topic.body) < 1021:
                 embed.add_field(name=topic.subject, value=topic.body)
             else:
-                embed.add_field(name=topic.subject, value=topic.body[:1021]+"...")
+                embed.add_field(name=topic.subject, value=topic.body[:1018]+"...")
+                for x in range(1, int(len(topic.body) / 1018 + 1)):
+                    if x != int(len(topic.body) / 1018):
+                        embed.add_field(name=topic.subject + " (cont.)", value="...{}...".format(topic.body[x*1018:(x+1)*1018]))
+                    else:
+                        embed.add_field(name=topic.subject + " (cont.)", value="...{}".format(topic.body[x*1018:(x+1)*1018]))
         else:
             embed.add_field(name=topic.subject, value="\u200b")
         # Add a field for tags in the title because you cant have links in a field name,
@@ -173,20 +186,31 @@ class HSX(object):
                     change = "No change today."
             else:
                 change = "Delisted"
-            """ Find the type of stock to get the KaiGee url. """
+            """ Find the type of stock to get the KaiGee url and the max shares"""
             kaigee_base = "[{1}](https://www.kaigee.com/{0}/{1})"
             if soup.find("div", class_="inner_columns").find("h4").text == "Distributor":
                 kaigee = kaigee_base.format("MST", match)
+                max_minus_one = "99999"
             elif soup.find("div", class_="inner_columns").find("h4").text == "Filmography":
                 kaigee = kaigee_base.format("SBO", match)
+                max_minus_one = "19999"
             elif "." in match:
                 kaigee = "None, derivative."
+                max_minus_one = "19999"
             elif "Fund Manager:" in soup.find("div", class_="data_column").prettify():
                 kaigee = kaigee_base.format("FND", match)
+                max_minus_one = "19999"
             elif "TVStocks" in soup.prettify():
                 kaigee = "None, TVStock."
+                max_minus_one = "19999"
             else:
                 kaigee = "Unknown."
+                max_minus_one = "99999"
+            base_trade_text = "[{1} {2}](https://www.hsx.com/trade/?symbol={0}&shares={2}&action=place-order&tradeType={1})"
+            quickbuy_text = base_trade_text.format(match, "buy", "max")
+            quickshort_text = base_trade_text.format(match, "short", "max")
+            almost_max_buy = base_trade_text.format(match, "buy", max_minus_one)
+            almost_max_short = base_trade_text.format(match, "short", max_minus_one)
             embed = discord.Embed(color=(discord.Color.from_rgb(167, 200, 116)))
             embed.set_footer(text="Happy trades!")
             embed.set_author(name=title, url=url,
@@ -194,6 +218,10 @@ class HSX(object):
             embed.add_field(name=match, value=price)
             embed.add_field(name="Change Today", value=change)
             embed.add_field(name="Kaigee Link", value=kaigee, inline=False)
+            embed.add_field(name="Buy max", value=quickbuy_text)
+            embed.add_field(name="Short max", value=quickshort_text)
+            embed.add_field(name="Buy " + max_minus_one, value=almost_max_buy)
+            embed.add_field(name="Short " + max_minus_one, value=almost_max_short)
             await message.guild.me.edit(nick="HSX")
             await message.channel.send(embed=embed)
             await message.guild.me.edit(nick=None)
