@@ -130,7 +130,7 @@ class HSX(object):
             title_tags = title_tags[:-2] # remove the last ", "
             embed.add_field(name="Tags From Title", value=title_tags, inline=False)
         # Submit time
-        embed.add_field(name="Submitted on", value=topic.time_)
+        embed.add_field(name="Submitted on", value=topic.time_, inline=False)
         return embed
     
     async def stock_finder(self, message):
@@ -191,7 +191,7 @@ class HSX(object):
             if soup.find("div", class_="inner_columns").find("h4").text == "Distributor":
                 kaigee = kaigee_base.format("MST", match)
                 max_minus_one = "99999"
-            elif soup.find("div", class_="inner_columns").find("h4").text == "Filmography":
+            elif soup.find("div", class_="inner_columns").find("h4").text == "Filmography" or "NominOptionsSM" in soup.prettify():
                 kaigee = kaigee_base.format("SBO", match)
                 max_minus_one = "19999"
             elif "." in match:

@@ -11,32 +11,23 @@ from apscheduler.triggers.combining import OrTrigger
 from apscheduler.triggers.cron import CronTrigger
 import bs4
 import discord
-from discord.ext import commands
 import pandas as pd
 import requests
 import tabulate
 
-from redbot.core import checks
-from redbot.core.utils.chat_formatting import box, info, warning
+from redbot.core import checks, commands
+from redbot.core.utils.chat_formatting import box, info, warning, pagify
 from redbot.core import Config
 
-dflt_guild = {"deadline_url": None,
-              "footer": ("Make sure to subscribe to alerts in the "
-                         "#react-for-roles channel so you can get notified "
-                         "when we release more breaking news."),
+dflt_guild = {"deadline_url": "https://deadline.com/2018/08/melissa-mccarthy-happytime-murders-crazy-rich-asians-meg-weekend-box-office-1202451694/",
               "last_updated_content": "",
               "last_updated_text": "",
               "last_updated_time": "",
               "stop_checking": False}
 
-filename_ = "/home/yack/.local/share/Red-DiscordBot/logs/cogs/deadline.txt"
-file_handler = logging.FileHandler(filename=filename_)
-stdout_handler = logging.StreamHandler(sys.stdout)
-handlers = [file_handler, stdout_handler]
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
-    handlers=handlers
 )
 
 class Deadline(object):
@@ -96,22 +87,19 @@ class Deadline(object):
         else:
             fmt = "Unable to get Deadline page: {}"
             self.log.warning(fmt.format(deadline_url))
-        time_ = soup.find("time", class_="date-published")
-        time_ = time_.text
-        await settings.last_updated_time.set(time_)
-        content_ = soup.find("div", class_="post-content").find("p")
-        if await settings.last_updated_content() == "":
-            await settings.last_updated_content.set(content_)
-        if await settings.last_updated_text() == "":
-            await settings.last_updated_text.set(content_.text)
-        elif await settings.last_updated_text() != content_.text:
-            # I only pass content_ here for optimization, since we could
-            # just get it from soup. At least I think it's probably better.
-            await self.handle_update(ctx, content_, soup)
-            # After we've run the update once, now we set it into edit mode.
-            # Remember the scheduler will reset edit mode to False at the start
-            # of each interval.
-            await settings.edit_mode.set(True)
+        full_text = [str(p) for p in soup.find("div", class_="post-content").find_all("p")]
+        count = 0
+        for i,p in enumerate(full_text):
+            if "UPDATE" in p:
+                count += 1
+            if count == 2:
+                break
+        update_text = full_text[:i]
+        for page in pagify("\n".join(update_text)):
+            await ctx.send(page)
+        sentences = [p.split(". ") for p in update_text]
+        if sentences != await settings.sentences():
+            await ctx.send(embed=await self.handle_update(ctx, soup))
         else:
             self.log.info("no update")
 
@@ -121,7 +109,7 @@ class Deadline(object):
         author_byline = soup.find("span", class_="byline").find("a",
                                                                 class_="name")
         author_name = author_byline.text
-        author_link = author_byline.href
+        author_link = author_byline.get("href")
 
         # Yeah screw getting this automatically.
         author_image = "https://pmcdeadline2.files.wordpress.com/2014/06/anthony-dalessandro.png"
@@ -152,125 +140,19 @@ class Deadline(object):
         return embed
 
     @deadline_main.command(name="begin", pass_context=True)
-    async def deadline_begin(self, ctx, url : str, friday_morning: bool = False):
+    async def deadline_begin(self, ctx, url : str = ""):
         """Begin the scheduled deadline update check. Does not check for thursday
         night updates no matter what.
         :param: url: the deadline article URL
         :param: friday_morning: whether to check for a Fri morning update. To be
         used after a Thurs preview. Dflt False."""
-        logging.getLogger('apscheduler').setLevel(logging.DEBUG)
-        if url is None:
-            await ctx.send_help()
-
-        # Quickly set the deadline URL if it is one
-        if ("https://" in url or "http://" in url) and "deadline" in url:
-            await self.config.guild(ctx.guild).deadline_url.set(url)
-        else:
-            await ctx.send(("Are you sure that's a deadline URL?"
-                        "Please input a deadline.com url."))
-            return -1
-
-        # Make the scheduler
-        scheduler = AsyncIOScheduler()
-
-        # Reset edit mode.
-        def reset_edit_mode(self, ctx):
-            self.config.guild(ctx.guild).edit_mode.set(False)
-
-        # Quickly set up the Friday morning check if needed
-        if friday_morning:
-            friday_morning_trigger = CronTrigger(day_of_week="fri", hour="10-11",
-                                                minute="*")
-
-            scheduler.add_job(await self.deadline_update(ctx),
-                              friday_morning_trigger)
-
-            reset_edit_mode_trigger_fri_morn = OrTrigger([CronTrigger(day_of_week="fri",
-                                                                    hour="10")])
-            reset_edit_mode_fri_morn = scheduler.add_job(reset_edit_mode(self,ctx),
-                                                        reset_edit_mode_trigger_fri_morn)
-
-        # Trigger Warning ...sorry
-        # Set when the triggers go.
-        friday_afternoon_trigger = CronTrigger(day_of_week="fri", hour="14-17",
-                                               minute="*")
-        friday_night_trigger = OrTrigger([CronTrigger(day_of_week="fri",
-                                                      hour="22-23",
-                                                      minute="*/2"),
-                                          CronTrigger(day_of_week="sat",
-                                                      hour="0-2",
-                                                      minute="*"),
-                                          CronTrigger(day_of_week="sat",
-                                                      hour="3",
-                                                      minute="*/2")])
-
-        saturday_morning_trigger = OrTrigger([CronTrigger(day_of_week="sat",
-                                                          hour="8",
-                                                          minute="*/2"),
-                                              CronTrigger(day_of_week="sat",
-                                                          hour="9-11",
-                                                          minute="*")])
-
-        saturday_night_trigger = OrTrigger([CronTrigger(day_of_week="sat",
-                                                        hour="22-23",
-                                                        minute="*"),
-                                            CronTrigger(day_of_week="sun",
-                                                        hour="0-1",
-                                                        minute="*/2")])
-
-        sunday_morning_trigger = OrTrigger([CronTrigger(day_of_week="sun",
-                                                        hour="8",
-                                                        minute="*/2"),
-                                            CronTrigger(day_of_week="sun",
-                                                        hour="9-11",
-                                                        minute="*")])
-
-        weekend_end_trigger = CronTrigger(day_of_week="sun",
-                                          hour="12",
-                                          minute="0")
-
-        """
-        reset_edit_mode_trigger = OrTrigger([CronTrigger(day_of_week="fri",
-                                                         hour="14,22"),
-                                            CronTrigger(day_of_week="sat",
-                                                        hour="8,22"),
-                                            CronTrigger(day_of_week="sun",
-                                                        hour="8")])
-        """
-
-        # scheduler.add_job(await self.config.guild(ctx.guild).edit_mode\
-        #    .set(False),
-        #                 reset_edit_mode_trigger)
-
-        # Weekends on, time to go to work.
-        scheduler.add_job(await self.deadline_update(ctx),
-                          friday_afternoon_trigger)
-
-        scheduler.add_job(await self.deadline_update(ctx),
-                                         friday_night_trigger)
-
-        saturday_morning = scheduler.add_job(await self.deadline_update(ctx),
-                                             saturday_morning_trigger)
-
-        scheduler.add_job(await self.deadline_update(ctx),
-                          saturday_night_trigger)
-
-        sunday_morning = scheduler.add_job(await self.deadline_update(ctx),
-                                           sunday_morning_trigger)
-
-        # And... start!
-        scheduler.start()
-        self.log.info("started scheduler")
-        fmt = ("Started scheduler, searching for updates at designated times"
-               "...")
-        await ctx.send(fmt)
-
         # Now check if we should stop
+        if len(url) != 0:
+            await self.config.guild(ctx.guild).deadline_url.set(url)
         while not await self.config.guild(ctx.guild).stop_checking():
-            time.sleep(10)
+            await self.deadline_update(ctx)
+            time.sleep(5)
 
-        scheduler.shutdown()
-        self.log.info("shutdown scheduler")
         await self.config.guild(ctx.guild).stop_checking.set(False)
 
     @deadline_set.command(name="stop")
