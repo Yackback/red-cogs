@@ -19,16 +19,21 @@ from redbot.core import checks, commands
 from redbot.core.utils.chat_formatting import box, info, warning, pagify
 from redbot.core import Config
 
-dflt_guild = {"deadline_url": "https://deadline.com/2018/08/melissa-mccarthy-happytime-murders-crazy-rich-asians-meg-weekend-box-office-1202451694/",
-              "last_updated_content": "",
-              "last_updated_text": "",
-              "last_updated_time": "",
-              "stop_checking": False}
+dflt_guild = {
+    "deadline_url":
+    "https://deadline.com/2018/08/melissa-mccarthy-happytime-murders-crazy-rich-asians-meg-weekend-box-office-1202451694/",
+    "last_updated_content": "",
+    "last_updated_text": "",
+    "last_updated_time": "",
+    "stop_checking": False
+}
 
 logging.basicConfig(
     level=logging.INFO,
-    format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+    format=
+    '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
 )
+
 
 class Deadline(object):
     def __init__(self, bot):
@@ -39,8 +44,10 @@ class Deadline(object):
 
     async def get_chart(self, ctx):
         settings = self.config.guild(ctx.guild)
-        list_to_keep = ["title", "fri", "sat", "sun", "3-day",
-                        "3-day (-%)", "rank", "film", "title"]
+        list_to_keep = [
+            "title", "fri", "sat", "sun", "3-day", "3-day (-%)", "rank",
+            "film", "title"
+        ]
         most_recent_chart = pd.read_html(await settings.URL(),
                                          attrs={"class": "cc-table-container"})
         # Quick preliminary thing to get rid of all the unnamed stuff
@@ -48,17 +55,20 @@ class Deadline(object):
             most_recent_chart = most_recent_chart[0].iloc[3:18, 1:12]
         except IndexError:
             return ""
-        cols = [c.lower() for c in most_recent_chart.columns
-                if c.lower() in list_to_keep]
+        cols = [
+            c.lower() for c in most_recent_chart.columns
+            if c.lower() in list_to_keep
+        ]
         most_recent_chart = most_recent_chart[cols]
         # If fri sat and sun are in the chart, only keep the total... no one
         # cares about the splits
         if "fri" in cols and "sat" in cols and "sun" in cols:
             most_recent_chart.drop(["fri", "sat", "sun"], axis=1, inplace=True)
         most_recent_chart.to_csv("/home/yack/chart.txt", sep=";")
-        return box(tabulate.tabulate(most_recent_chart,
-                                     headers=most_recent_chart.columns,
-                                     showindex="never"))
+        return box(
+            tabulate.tabulate(most_recent_chart,
+                              headers=most_recent_chart.columns,
+                              showindex="never"))
 
     @commands.group(name="deadline", no_pm=True)
     @checks.mod_or_permissions(manage_guild=True)
@@ -71,8 +81,8 @@ class Deadline(object):
 
     @deadline_main.group("set", no_pm=True)
     async def deadline_set(self, ctx):
-        if ctx.invoked_subcommand is None or isinstance(ctx.invoked_subcommand,
-                                                        commands.Group):
+        if ctx.invoked_subcommand is None or isinstance(
+                ctx.invoked_subcommand, commands.Group):
             await ctx.send_help()
 
     async def deadline_update(self, ctx):
@@ -87,9 +97,12 @@ class Deadline(object):
         else:
             fmt = "Unable to get Deadline page: {}"
             self.log.warning(fmt.format(deadline_url))
-        full_text = [str(p) for p in soup.find("div", class_="post-content").find_all("p")]
+        full_text = [
+            str(p)
+            for p in soup.find("div", class_="post-content").find_all("p")
+        ]
         count = 0
-        for i,p in enumerate(full_text):
+        for i, p in enumerate(full_text):
             if "UPDATE" in p:
                 count += 1
             if count == 2:
@@ -118,9 +131,9 @@ class Deadline(object):
         footer = await settings.footer()
 
         # Deal with the chart. :)
-        chart_string = (soup.find("div",
-                                  attrs={"class": "post-content"})
-                                  .find("p").find("strong").text.lower())
+        chart_string = (soup.find("div", attrs={
+            "class": "post-content"
+        }).find("p").find("strong").text.lower())
         chart = ""
         if "with chart" in chart_string:
             chart = await self.get_chart(ctx)
@@ -131,8 +144,9 @@ class Deadline(object):
         else:
             chart = warning("NO DISCERNABLE MENTION OF CHART")
 
-        embed = discord.Embed(color=(discord.Color.from_rgb(255,255,255)))
-        embed.set_author(name=author_name, url=author_link,
+        embed = discord.Embed(color=(discord.Color.from_rgb(255, 255, 255)))
+        embed.set_author(name=author_name,
+                         url=author_link,
                          icon_url=author_image)
         embed.set_footer(text=footer)
         embed.add_field(name="Update", value=deadline_title)
@@ -140,7 +154,7 @@ class Deadline(object):
         return embed
 
     @deadline_main.command(name="begin", pass_context=True)
-    async def deadline_begin(self, ctx, url : str = ""):
+    async def deadline_begin(self, ctx, url: str = ""):
         """Begin the scheduled deadline update check. Does not check for thursday
         night updates no matter what.
         :param: url: the deadline article URL
